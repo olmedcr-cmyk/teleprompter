@@ -1,0 +1,33 @@
+name: Algo no funciona
+description: Un fallo en el teleprompter o en la documentación
+labels: [bug]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas y qué ocurrió.
+    validations: { required: true }
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: "1. Abre Ajustes…\n2. Activa el espejo…"
+    validations: { required: true }
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador y dispositivo
+      placeholder: Safari 19 en iPad, Chrome 142 en macOS…
+    validations: { required: true }
+  - type: dropdown
+    id: tema
+    attributes:
+      label: Tema
+      options: [Carbón, Papel, Blanco, No importa]
+  - type: textarea
+    id: consola
+    attributes:
+      label: Consola
+      description: Errores de la consola del navegador, si los hay. No pegues tu guion.
+      render: text

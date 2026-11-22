@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="es" data-frk="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teleprompter</title>
+<meta name="description" content="Teleprompter en el navegador: edita el guion en pantalla, ajusta tipografía y velocidad, espejo y cuenta atrás. Diseño Frekvens.">
+<meta name="theme-color" content="#0e0e0d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e0e0d'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23ff6a2e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800&family=Doto:wght@700;800;900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* ---------- Frekvens · tokens ---------- */
+:root, [data-frk="light"]{               /* Papel */
+  --paper:#e7e5e0; --surface:#f5f4f0; --well:#d6d3cc; --dot-off:#dddddb; --line:#c4c0b8;
+  --ink:#111111; --ink-muted:#57534d; --ink-faint:#8f8a82;
+  --klein:#002fa7; --on-klein:#ffffff; --klein-ink:#002fa7;
+  --sol:#ffd447; --on-sol:#111111; --rams:#f2581e; --on-rams:#111111;
+  --verde:#1f5a3a; --rec:#d42a20; --focus:var(--klein-ink);
+  --shadow-press:inset 0 2px 0 rgba(0,0,0,0.10);
+  --shadow-lift:0 1px 1px rgba(0,0,0,0.06), 0 8px 18px -10px rgba(0,0,0,0.45);
+  --shadow-float:0 1px 2px rgba(0,0,0,0.10), 0 12px 28px -12px rgba(0,0,0,0.35);
+}
+[data-frk="blanco"]{                      /* Blanco: solo cambian los neutros */
+  --paper:#ffffff; --surface:#f4f4f4; --well:#e4e4e4; --dot-off:#dedede; --line:#cfcfcf;
+  --ink-muted:#555555; --ink-faint:#8c8c8c;
+}
+[data-frk="dark"]{                        /* Carbón */
+  --paper:#0e0e0d; --surface:#1b1a18; --well:#292724; --dot-off:#323231; --line:#3a3732;
+  --ink:#f2f0ea; --ink-muted:#a8a39a; --ink-faint:#6c6861;
+  --klein:#2251e0; --on-klein:#ffffff; --klein-ink:#93a8ff;
+  --sol:#ffd447; --on-sol:#111111; --rams:#ff6a2e; --on-rams:#111111;
+  --verde:#2f7d52; --rec:#ff4a3d;
+  --shadow-press:inset 0 2px 0 rgba(0,0,0,0.45);
+  --shadow-lift:0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-float:0 1px 2px rgba(0,0,0,0.5), 0 12px 28px -12px rgba(0,0,0,0.8);
+}
+:root{
+  --font-sans:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --font-dot:"Doto","Archivo",monospace;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px; --space-7:48px;
+  --radius-sm:8px; --radius-md:16px; --radius-lg:24px; --radius-xl:40px; --radius-full:9999px;
+  --hit-min:56px;
+  --dur-press:90ms; --dur-fast:150ms; --dur-base:220ms; --dur-sheet:500ms;
+  --ease-ui:cubic-bezier(0.3,0.75,0.1,1); --ease-exit:cubic-bezier(0.4,0,1,1);
+  --ease-settle:cubic-bezier(0.22,1,0.36,1); --ease-travel:cubic-bezier(0.45,0,0.1,1);
+  /* teleprompter */
+  --bg:#0e0e0d; --fg:#f2f0ea; --size:64px; --lh:1.4; --width:80%; --guide:35;
+}
+
+*, *::before, *::after{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+  font:400 16px/22px var(--font-sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* ---------- Frekvens · componentes ---------- */
+.frk-cap{font:500 11px/14px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);margin:0}
+
+/* KeyButton */
+.frk-key{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);
+  min-width:var(--hit-min);height:var(--hit-min);padding:0 var(--space-4);border-radius:var(--radius-md);
+  background:var(--well);color:var(--ink);font:700 17px/1 var(--font-sans);letter-spacing:-.01em;white-space:nowrap;
+  transition:transform var(--dur-press) var(--ease-ui),box-shadow var(--dur-fast) var(--ease-ui),background-color var(--dur-fast),color var(--dur-fast)}
+.frk-key:active{transform:scale(.965);box-shadow:var(--shadow-press)}
+.frk-key svg{width:24px;height:24px;flex:none}
+.frk-key--pill{border-radius:var(--radius-full);padding:0 var(--space-5)}
+.frk-key--round{border-radius:var(--radius-full);padding:0;width:var(--hit-min)}
+.frk-key--block{width:100%}
+.frk-key.is-active{background:var(--ink);color:var(--paper);box-shadow:var(--shadow-press)}
+.frk-tone--rams{background:var(--rams);color:var(--on-rams)}
+.frk-tone--paper{background:var(--surface);color:var(--ink)}
+@media (hover:hover){ .frk-key:hover:not(:active){transform:translateY(-1px);box-shadow:var(--shadow-lift)} }
+
+/* LED */
+.frk-led{display:inline-flex;align-items:center;gap:var(--space-2);font:500 11px/14px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted)}
+.frk-led__lamp{width:10px;height:6px;border-radius:2px;background:var(--dot-off);flex:none;
+  transition:background-color var(--dur-fast),box-shadow var(--dur-fast)}
+.frk-led[data-tone="verde"] .frk-led__lamp{background:var(--verde);box-shadow:0 0 0 3px color-mix(in srgb,var(--verde) 22%,transparent)}
+.frk-led[data-tone="klein"] .frk-led__lamp{background:var(--klein);box-shadow:0 0 0 3px color-mix(in srgb,var(--klein) 22%,transparent)}
+.frk-led[data-tone="sol"] .frk-led__lamp{background:var(--sol);box-shadow:0 0 0 3px color-mix(in srgb,var(--sol) 30%,transparent)}
+.frk-led.is-blink .frk-led__lamp{animation:frk-blink 1.2s steps(2,jump-none) infinite}
+@keyframes frk-blink{50%{opacity:.15}}
+
+/* Readout */
+.frk-readout{display:flex;flex-direction:column;gap:var(--space-1)}
+.frk-readout__value{font:800 24px/28px var(--font-dot);color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+
+/* Slider */
+.frk-slider{display:flex;flex-direction:column;gap:var(--space-2);min-width:0}
+.frk-slider__head{display:flex;justify-content:space-between;gap:var(--space-2)}
+.frk-slider__head output{font:500 11px/14px var(--font-mono);letter-spacing:.08em;color:var(--ink);font-variant-numeric:tabular-nums}
+.frk-range{-webkit-appearance:none;appearance:none;display:block;margin:0;width:100%;height:var(--hit-min);border-radius:var(--radius-full);
+  padding:0 16px;cursor:pointer;
+  background:
+    radial-gradient(circle,var(--ink) 2.6px,transparent 3.2px) left 19px center / 6px 6px no-repeat,
+    radial-gradient(circle,var(--ink) 2.6px,transparent 3.2px) right 19px center / 6px 6px no-repeat,
+    var(--well)}
+.frk-range::-webkit-slider-runnable-track{height:var(--hit-min);background:transparent}
+.frk-range::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:16px;border-radius:50%;background:var(--rams);border:0}
+.frk-range::-moz-range-track{background:transparent}
+.frk-range::-moz-range-thumb{width:24px;height:24px;border:0;border-radius:50%;background:var(--rams)}
+.frk-range:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* Switch */
+.frk-switchrow{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);min-height:var(--hit-min)}
+.frk-switchrow__label{font:700 16px/22px var(--font-sans)}
+.frk-switch{position:relative;flex:none;width:120px;height:var(--hit-min);border-radius:var(--radius-full);overflow:hidden;
+  background:var(--well);color:var(--ink);transition:background-color var(--dur-fast),color var(--dur-fast)}
+.frk-switch__dot{position:absolute;left:8px;top:8px;width:40px;height:40px;border-radius:var(--radius-full);border:2.5px solid var(--ink);
+  transition:transform 380ms var(--ease-settle),width var(--dur-press) var(--ease-ui),background-color var(--dur-fast),border-color var(--dur-fast)}
+.frk-switch:active .frk-switch__dot{width:50px}
+.frk-switch__text{position:absolute;top:50%;font:500 11px/14px var(--font-mono);letter-spacing:.08em;
+  transition:opacity var(--dur-fast) var(--ease-ui),transform var(--dur-base) var(--ease-ui)}
+.frk-switch__text--off{right:20px;transform:translateY(-50%)}
+.frk-switch__text--on{left:20px;transform:translate(-8px,-50%);opacity:0}
+.frk-switch.is-on{background:var(--ink);color:var(--paper)}
+.frk-switch.is-on .frk-switch__dot{transform:translateX(64px);background:var(--sol);border-color:var(--sol)}
+.frk-switch.is-on:active .frk-switch__dot{transform:translateX(54px)}
+.frk-switch.is-on .frk-switch__text--on{transform:translate(0,-50%);opacity:1}
+.frk-switch.is-on .frk-switch__text--off{transform:translate(8px,-50%);opacity:0}
+
+/* Segmented */
+.frk-seg{display:flex;padding:4px;gap:4px;border-radius:var(--radius-full);background:var(--ink)}
+.frk-seg__opt{flex:1;min-height:48px;padding:0 var(--space-3);border-radius:var(--radius-full);color:var(--paper);
+  font:700 15px/1 var(--font-sans);letter-spacing:-.01em;white-space:nowrap;
+  transition:background-color var(--dur-fast) var(--ease-travel),color var(--dur-fast),transform var(--dur-press)}
+.frk-seg__opt:active{transform:scale(.965)}
+.frk-seg__opt.is-on{background:var(--paper);color:var(--ink)}
+
+/* Select y campo */
+.frk-field{display:flex;flex-direction:column;gap:var(--space-2)}
+.frk-select{-webkit-appearance:none;appearance:none;width:100%;height:var(--hit-min);border:2px solid transparent;border-radius:var(--radius-full);
+  padding:0 48px 0 var(--space-5);font:700 16px/1 var(--font-sans);cursor:pointer;color:var(--ink);
+  background:var(--well) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238f8a82' stroke-width='2' stroke-linecap='square'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 18px center / 20px no-repeat}
+.frk-select:focus-visible{outline:none;background-color:var(--surface);border-color:var(--focus)}
+.frk-area{width:100%;min-height:200px;resize:vertical;border:2px solid transparent;border-radius:var(--radius-lg);
+  padding:var(--space-4) var(--space-5);background:var(--well);color:var(--ink);font:400 17px/25px var(--font-sans);outline:none;
+  transition:background-color var(--dur-fast) var(--ease-ui),border-color var(--dur-fast)}
+.frk-area:focus{background:var(--surface);border-color:var(--focus)}
+.frk-area::placeholder{color:var(--ink-muted)}
+.frk-swatch{display:flex;align-items:center;gap:var(--space-3);cursor:pointer}
+.frk-swatch input{-webkit-appearance:none;appearance:none;width:var(--hit-min);height:var(--hit-min);border:0;padding:0;background:none;border-radius:50%;cursor:pointer}
+.frk-swatch input::-webkit-color-swatch-wrapper{padding:0}
+.frk-swatch input::-webkit-color-swatch{border:2px solid var(--line);border-radius:50%}
+.frk-swatch input::-moz-color-swatch{border:2px solid var(--line);border-radius:50%}
+.frk-swatch span{font:700 16px/22px var(--font-sans)}
+.frk-chip{display:inline-flex;align-items:center;height:28px;padding:0 var(--space-3);border-radius:var(--radius-sm);
+  background:var(--well);color:var(--ink);font:500 11px/14px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+
+/* Sheet */
+.frk-sheet{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;justify-content:flex-end}
+.frk-sheet.is-open{display:flex}
+.frk-sheet__scrim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;transition:opacity var(--dur-fast) var(--ease-exit)}
+.frk-sheet.is-in .frk-sheet__scrim{opacity:1;transition:opacity var(--dur-base) var(--ease-ui)}
+.frk-sheet__panel{position:relative;width:100%;max-width:560px;max-height:88%;margin:0 auto;overflow:auto;
+  padding:0 var(--space-5) var(--space-6);border-radius:var(--radius-xl) var(--radius-xl) 0 0;background:var(--paper);color:var(--ink);
+  outline:none;transform:translateY(100%);transition:transform var(--dur-base) var(--ease-exit);overscroll-behavior:contain}
+.frk-sheet.is-in .frk-sheet__panel{transform:none;transition:transform var(--dur-sheet) var(--ease-ui)}
+.frk-sheet.is-in .frk-sheet__panel.is-dragging{transition:none}
+.frk-sheet__grab{position:sticky;top:0;z-index:2;display:flex;justify-content:center;padding:var(--space-3) 0 var(--space-2);
+  margin:0 calc(var(--space-5) * -1);background:var(--paper);cursor:grab;touch-action:none}
+.frk-sheet__grab span{width:40px;height:5px;border-radius:var(--radius-full);background:var(--dot-off)}
+.frk-sheet__head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);padding:var(--space-2) 0 var(--space-6)}
+.frk-sheet__title{margin:0;font:800 32px/1 var(--font-sans);letter-spacing:-.02em}
+.frk-sheet__title span{display:block;color:var(--ink-muted)}
+.frk-sheet__body{display:flex;flex-direction:column;gap:var(--space-6)}
+.grp{display:flex;flex-direction:column;gap:var(--space-4)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:var(--space-2) var(--space-4);align-items:center}
+.keys > span:nth-child(odd){display:flex;gap:var(--space-1)}
+.keys > span:nth-child(even){font:400 16px/22px var(--font-sans)}
+
+/* ---------- escenario ---------- */
+#stage{position:fixed;inset:0;overflow:hidden;background:var(--bg);touch-action:none;cursor:pointer}
+#flip{position:absolute;inset:0}
+#scroller{position:absolute;left:0;right:0;top:0;will-change:transform}
+#text{width:var(--width);margin:0 auto;color:var(--fg);
+  font-size:var(--size);line-height:var(--lh);font-weight:700;letter-spacing:-.01em;
+  white-space:pre-wrap;overflow-wrap:break-word;
+  padding-top:calc(var(--guide)*1vh - var(--size)*var(--lh)/2);
+  padding-bottom:calc((100 - var(--guide))*1vh);
+  user-select:none;-webkit-user-select:none}
+#guide{position:absolute;left:0;right:0;top:calc(var(--guide)*1vh);height:0;pointer-events:none}
+#guide::before,#guide::after{content:"";position:absolute;top:-12px;width:24px;height:24px;border-radius:50%;background:var(--rams)}
+#guide::before{left:-12px}
+#guide::after{right:-12px}
+#guide[hidden]{display:none}
+#progress{position:fixed;left:0;top:0;height:4px;width:0;background:var(--rams);z-index:5}
+#count{position:fixed;inset:0;display:none;place-items:center;z-index:6;pointer-events:none;
+  font:800 min(60vw,60vh)/.9 var(--font-dot);letter-spacing:-.02em;color:var(--fg);font-variant-numeric:tabular-nums}
+#count.on{display:grid}
+
+body.editing #stage{cursor:default}
+body.editing #text{user-select:text;-webkit-user-select:text;cursor:text;outline:none;caret-color:var(--rams);min-height:100vh}
+body.editing #text::selection{background:color-mix(in srgb,var(--sol) 55%,transparent)}
+#hint{position:fixed;top:var(--space-4);left:50%;transform:translateX(-50%);z-index:9;display:none;
+  height:40px;padding:0 var(--space-4);border-radius:var(--radius-full);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-float);white-space:nowrap}
+body.editing #hint{display:inline-flex}
+
+/* ---------- botonera ---------- */
+#bar{position:fixed;left:var(--space-3);right:var(--space-3);margin:0 auto;width:fit-content;max-width:calc(100vw - 24px);
+  bottom:max(var(--space-3),env(safe-area-inset-bottom));z-index:10;
+  display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:center;gap:var(--space-2) var(--space-4);
+  padding:var(--space-2);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-float);
+  transition:opacity var(--dur-base) var(--ease-ui)}
+body.idle #bar{opacity:0;pointer-events:none}
+body.idle #stage{cursor:none}
+.row{display:flex;align-items:flex-end;gap:var(--space-2)}
+#meter{min-width:104px;padding:0 var(--space-2) var(--space-2)}
+#bar .frk-slider{width:180px}
+@media (max-width:720px){ #bar .frk-slider{width:140px} .hide-s{display:none} }
+@media (prefers-reduced-motion:reduce){ *{transition:none !important;animation:none !important} }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="flip">
+    <div id="scroller"><div id="text"></div></div>
+    <div id="guide"></div>
+  </div>
+</div>
+<div id="progress"></div>
+<div id="count"></div>
+<div id="hint" class="frk-led is-blink" data-tone="sol"><i class="frk-led__lamp"></i>Editando · Esc para terminar</div>
+
+<div id="bar">
+  <div class="row">
+    <button class="frk-key frk-tone--rams" id="play" aria-label="Empezar"></button>
+    <button class="frk-key" id="reset" aria-label="Volver al inicio" title="Volver al inicio (R)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14"/><path d="M19 5v14L9 12z"/></svg></button>
+  </div>
+  <div class="frk-readout" id="meter">
+    <span class="frk-led" id="state"><i class="frk-led__lamp"></i><span id="stateWord">Listo</span></span>
+    <span class="frk-readout__value" id="time">0:00</span>
+  </div>
+  <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Velocidad</span><output data-o="speed"></output></span>
+    <input type="range" class="frk-range" data-k="speed" min="1" max="100" step="1" aria-label="Velocidad"></label>
+  <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Tamaño</span><output data-o="size"></output></span>
+    <input type="range" class="frk-range" data-k="size" min="20" max="220" step="2" aria-label="Tamaño de letra"></label>
+  <div class="row">
+    <button class="frk-key frk-key--pill" id="inline" title="Editar el texto en pantalla (T o doble clic)">Editar</button>
+    <button class="frk-key frk-key--pill" id="mirror" aria-pressed="false" title="Espejo (M)">Espejo</button>
+    <button class="frk-key frk-key--pill" id="edit" title="Guion y ajustes (E)">Ajustes</button>
+    <button class="frk-key frk-key--round hide-s" id="full" aria-label="Pantalla completa" title="Pantalla completa (F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+</div>
+
+<div class="frk-sheet" id="sheet">
+  <div class="frk-sheet__scrim" id="scrim"></div>
+  <div class="frk-sheet__panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <div class="frk-sheet__grab" id="grab"><span></span></div>
+    <div class="frk-sheet__head">
+      <h2 class="frk-sheet__title" id="sheetTitle">Ajustes<span id="stats"></span></h2>
+      <button class="frk-key frk-key--round" id="close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="frk-sheet__body">
+      <section class="grp">
+        <label class="frk-field"><span class="frk-cap">Guion</span>
+          <textarea class="frk-area" data-k="script" placeholder="Pega aquí tu guion" spellcheck="false"></textarea></label>
+      </section>
+
+      <section class="grp">
+        <p class="frk-cap">Tipografía</p>
+        <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Tamaño</span><output data-o="size"></output></span>
+          <input type="range" class="frk-range" data-k="size" min="20" max="220" step="2" aria-label="Tamaño de letra"></label>
+        <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Interlineado</span><output data-o="lh"></output></span>
+          <input type="range" class="frk-range" data-k="lh" min="1" max="2.4" step="0.05" aria-label="Interlineado"></label>
+        <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Ancho de texto</span><output data-o="width"></output></span>
+          <input type="range" class="frk-range" data-k="width" min="30" max="100" step="1" aria-label="Ancho de texto"></label>
+        <div class="frk-field"><span class="frk-cap" id="l-font">Fuente</span>
+          <div class="frk-seg" role="radiogroup" aria-labelledby="l-font" data-k="font">
+            <button class="frk-seg__opt" role="radio" data-v="sans">Archivo</button>
+            <button class="frk-seg__opt" role="radio" data-v="mono">Plex Mono</button>
+            <button class="frk-seg__opt" role="radio" data-v="serif">Serif</button></div></div>
+        <div class="frk-field"><span class="frk-cap" id="l-weight">Grosor</span>
+          <div class="frk-seg" role="radiogroup" aria-labelledby="l-weight" data-k="weight">
+            <button class="frk-seg__opt" role="radio" data-v="400">Normal</button>
+            <button class="frk-seg__opt" role="radio" data-v="700">Negrita</button>
+            <button class="frk-seg__opt" role="radio" data-v="800">Extra</button></div></div>
+        <div class="frk-field"><span class="frk-cap" id="l-align">Alineación</span>
+          <div class="frk-seg" role="radiogroup" aria-labelledby="l-align" data-k="align">
+            <button class="frk-seg__opt" role="radio" data-v="left">Izquierda</button>
+            <button class="frk-seg__opt" role="radio" data-v="center">Centro</button>
+            <button class="frk-seg__opt" role="radio" data-v="justify">Justificar</button></div></div>
+        <div class="frk-switchrow"><span class="frk-switchrow__label" id="l-upper">Mayúsculas</span>
+          <button class="frk-switch" role="switch" aria-labelledby="l-upper" data-k="upper"><span class="frk-switch__dot"></span><span class="frk-switch__text frk-switch__text--on">ON</span><span class="frk-switch__text frk-switch__text--off">OFF</span></button></div>
+      </section>
+
+      <section class="grp">
+        <p class="frk-cap">Color</p>
+        <div class="frk-field"><span class="frk-cap" id="l-theme">Tema</span>
+          <div class="frk-seg" role="radiogroup" aria-labelledby="l-theme" data-k="theme">
+            <button class="frk-seg__opt" role="radio" data-v="dark">Carbón</button>
+            <button class="frk-seg__opt" role="radio" data-v="light">Papel</button>
+            <button class="frk-seg__opt" role="radio" data-v="blanco">Blanco</button></div></div>
+        <div class="pair">
+          <label class="frk-swatch"><input type="color" data-k="fg"><span>Texto</span></label>
+          <label class="frk-swatch"><input type="color" data-k="bg"><span>Fondo</span></label>
+        </div>
+      </section>
+
+      <section class="grp">
+        <p class="frk-cap">Desplazamiento</p>
+        <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Velocidad</span><output data-o="speed"></output></span>
+          <input type="range" class="frk-range" data-k="speed" min="1" max="100" step="1" aria-label="Velocidad"></label>
+        <label class="frk-slider"><span class="frk-slider__head"><span class="frk-cap">Línea de lectura</span><output data-o="guide"></output></span>
+          <input type="range" class="frk-range" data-k="guide" min="10" max="80" step="1" aria-label="Altura de la línea de lectura"></label>
+        <label class="frk-field"><span class="frk-cap">Cuenta atrás</span>
+          <select class="frk-select" data-k="countdown">
+            <option value="0">Sin cuenta atrás</option><option value="3">3 segundos</option>
+            <option value="5">5 segundos</option><option value="10">10 segundos</option>
+            <option value="15">15 segundos</option></select></label>
+        <div class="frk-switchrow"><span class="frk-switchrow__label" id="l-flipH">Espejo</span>
+          <button class="frk-switch" role="switch" aria-labelledby="l-flipH" data-k="flipH"><span class="frk-switch__dot"></span><span class="frk-switch__text frk-switch__text--on">ON</span><span class="frk-switch__text frk-switch__text--off">OFF</span></button></div>
+        <div class="frk-switchrow"><span class="frk-switchrow__label" id="l-flipV">Invertir arriba y abajo</span>
+          <button class="frk-switch" role="switch" aria-labelledby="l-flipV" data-k="flipV"><span class="frk-switch__dot"></span><span class="frk-switch__text frk-switch__text--on">ON</span><span class="frk-switch__text frk-switch__text--off">OFF</span></button></div>
+        <div class="frk-switchrow"><span class="frk-switchrow__label" id="l-guide">Marcas de lectura</span>
+          <button class="frk-switch" role="switch" aria-labelledby="l-guide" data-k="showGuide"><span class="frk-switch__dot"></span><span class="frk-switch__text frk-switch__text--on">ON</span><span class="frk-switch__text frk-switch__text--off">OFF</span></button></div>
+      </section>
+
+      <section class="grp">
+        <p class="frk-cap">Atajos</p>
+        <div class="keys">
+          <span><kbd class="frk-chip">Espacio</kbd></span><span>Empieza o pausa</span>
+          <span><kbd class="frk-chip">↑</kbd><kbd class="frk-chip">↓</kbd></span><span>Cambia la velocidad</span>
+          <span><kbd class="frk-chip">←</kbd><kbd class="frk-chip">→</kbd></span><span>Retrocede o avanza</span>
+          <span><kbd class="frk-chip">+</kbd><kbd class="frk-chip">−</kbd></span><span>Cambia el tamaño</span>
+          <span><kbd class="frk-chip">T</kbd></span><span>Edita en pantalla (o doble clic)</span>
+          <span><kbd class="frk-chip">R</kbd></span><span>Vuelve al inicio</span>
+          <span><kbd class="frk-chip">M</kbd></span><span>Espejo</span>
+          <span><kbd class="frk-chip">F</kbd></span><span>Pantalla completa</span>
+          <span><kbd class="frk-chip">E</kbd></span><span>Ajustes</span>
+        </div>
+      </section>
+
+      <button class="frk-key frk-key--pill frk-key--block" id="defaults">Restaurar ajustes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLE = `Hola, este es tu teleprompter.
+
+Haz doble clic sobre este texto (o pulsa T) para editarlo aquí mismo: escribe, borra, añade saltos de línea y espacios. Pulsa Esc cuando termines.
+
+Abre Ajustes (tecla E) para cambiar el tamaño de la letra, el interlineado, el ancho, los colores y la velocidad.
+
+Pulsa Espacio para empezar o pausar. Con las flechas arriba y abajo cambias la velocidad mientras grabas, y con izquierda y derecha retrocedes o avanzas.
+
+Los dos discos de los lados marcan la línea de lectura: mantén la vista ahí y deja que el texto venga hacia ti.
+
+Si usas un cristal de teleprompter, activa el espejo con la tecla M.
+
+Respira, sonríe y graba.`;
+
+const THEMES = { dark:{fg:'#f2f0ea', bg:'#0e0e0d'}, light:{fg:'#111111', bg:'#e7e5e0'}, blanco:{fg:'#111111', bg:'#ffffff'} };
+const DEF = {size:64, speed:20, lh:1.4, width:80, guide:35, font:'sans', weight:'700', align:'left',
+  theme:'dark', fg:THEMES.dark.fg, bg:THEMES.dark.bg, flipH:false, flipV:false, upper:false, showGuide:true, countdown:3};
+const FONTS = {
+  sans:'"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif',
+  mono:'"IBM Plex Mono",ui-monospace,Menlo,monospace',
+  serif:'Georgia,"Times New Roman",serif'
+};
+const FMT = {size:v=>v+'px', speed:v=>v, lh:v=>(+v).toFixed(2), width:v=>v+'%', guide:v=>v+'%'};
+const ICON = {
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15L20 12z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>'
+};
+const STORE = 'teleprompter-frekvens';
+
+let S = {...DEF, script:SAMPLE};
+try {
+  const saved = localStorage.getItem(STORE);
+  if (saved) Object.assign(S, JSON.parse(saved));
+  else {                                           // conserva el guion de versiones anteriores
+    for (const k of ['teleprompter-dodo', 'teleprompter']){
+      const old = JSON.parse(localStorage.getItem(k) || '{}');
+      if (old.script && !old.script.startsWith('Hola, este es tu teleprompter')){ S.script = old.script; break; }
+    }
+  }
+} catch(e){}
+if (typeof S.countdown === 'boolean') S.countdown = S.countdown ? 3 : 0;
+if (!THEMES[S.theme]) S.theme = 'dark';
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} };
+
+const $ = id => document.getElementById(id);
+const stage=$('stage'), flip=$('flip'), scroller=$('scroller'), text=$('text'), guide=$('guide'),
+      sheet=$('sheet'), panel=$('panel'), playBtn=$('play'), timeEl=$('time'), progress=$('progress'), countEl=$('count');
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const mmss = s => { s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+
+let pos=0, max=0, playing=false, counting=null, last=0, wakeLock=null, idleT=null, editing=false, sheetOpen=false;
+
+const pxps = () => S.speed * 0.035 * S.size * (S.lh/1.4);   // px por segundo
+
+function measure(){
+  const ratio = max ? pos/max : 0;
+  max = Math.max(0, text.offsetHeight - window.innerHeight);
+  pos = editing ? Math.min(pos, max) : ratio * max;
+  render();
+  const words = S.script.trim().split(/\s+/).filter(Boolean).length;
+  $('stats').textContent = words + ' palabras · ' + mmss(max/pxps());
+}
+
+let lastTime='';
+function render(){
+  scroller.style.transform = 'translate3d(0,' + (-pos) + 'px,0)';
+  progress.style.width = (max ? pos/max*100 : 0) + '%';
+  const t = mmss((max-pos)/pxps());
+  if (t !== lastTime) timeEl.textContent = lastTime = t;
+}
+
+function apply(){
+  const root = document.documentElement, r = root.style;
+  root.dataset.frk = S.theme;
+  r.setProperty('--size', S.size+'px'); r.setProperty('--lh', S.lh);
+  r.setProperty('--width', S.width+'%'); r.setProperty('--guide', S.guide);
+  r.setProperty('--fg', S.fg); r.setProperty('--bg', S.bg);
+  text.style.fontFamily = FONTS[S.font] || FONTS.sans;
+  text.style.fontWeight = S.weight;
+  text.style.textAlign = S.align;
+  text.style.textTransform = S.upper ? 'uppercase' : 'none';
+  flip.style.transform = editing ? 'none' : 'scale(' + (S.flipH?-1:1) + ',' + (S.flipV?-1:1) + ')';
+  guide.hidden = !S.showGuide;
+  if (!editing){
+    const shown = S.script.trim() ? S.script : 'Pega tu guion en Ajustes o haz doble clic aquí';
+    if (text.textContent !== shown) text.textContent = shown;
+  }
+  $('mirror').classList.toggle('is-active', S.flipH);
+  $('mirror').setAttribute('aria-pressed', String(S.flipH));
+  document.querySelectorAll('input[data-k], select[data-k], textarea[data-k]').forEach(el => {
+    const v = S[el.dataset.k];
+    if (document.activeElement !== el || el.type === 'range') el.value = v;
+  });
+  document.querySelectorAll('.frk-seg[data-k]').forEach(g => {
+    g.querySelectorAll('.frk-seg__opt').forEach(o => {
+      const on = o.dataset.v === String(S[g.dataset.k]);
+      o.classList.toggle('is-on', on); o.setAttribute('aria-checked', String(on)); o.tabIndex = on ? 0 : -1;
+    });
+  });
+  document.querySelectorAll('.frk-switch[data-k]').forEach(b => {
+    const on = !!S[b.dataset.k];
+    b.classList.toggle('is-on', on); b.setAttribute('aria-checked', String(on));
+  });
+  document.querySelectorAll('[data-o]').forEach(o => o.textContent = FMT[o.dataset.o](S[o.dataset.o]));
+  measure();
+}
+function set(k, v){
+  S[k]=v;
+  if (k === 'theme') Object.assign(S, THEMES[v] || THEMES.dark);   // el tema trae su tinta y su papel
+  save(); apply();
+}
+
+/* ---------- controles ---------- */
+document.querySelectorAll('input[data-k], select[data-k], textarea[data-k]').forEach(el => {
+  el.addEventListener('input', () => set(el.dataset.k, el.type==='range' ? Number(el.value) : el.value));
+});
+document.querySelectorAll('.frk-seg[data-k]').forEach(g => {
+  const opts = [...g.querySelectorAll('.frk-seg__opt')];
+  opts.forEach((o, i) => {
+    o.addEventListener('click', () => set(g.dataset.k, o.dataset.v));
+    o.addEventListener('keydown', e => {
+      const d = {ArrowRight:1, ArrowDown:1, ArrowLeft:-1, ArrowUp:-1}[e.key];
+      if (!d) return;
+      e.preventDefault();
+      const n = opts[(i + d + opts.length) % opts.length];
+      set(g.dataset.k, n.dataset.v); n.focus();
+    });
+  });
+});
+document.querySelectorAll('.frk-switch[data-k]').forEach(b => {
+  b.addEventListener('click', () => { set(b.dataset.k, !S[b.dataset.k]); if (navigator.vibrate) navigator.vibrate(6); });
+});
+
+/* ---------- reproducción ---------- */
+async function lock(on){
+  try {
+    if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock=null; }
+  } catch(e){}
+}
+function setPlayUI(){
+  const on = playing || !!counting;
+  playBtn.classList.toggle('is-active', on);
+  if (playBtn.dataset.icon !== String(on)){ playBtn.innerHTML = on ? ICON.pause : ICON.play; playBtn.dataset.icon = String(on); }
+  playBtn.setAttribute('aria-label', on ? 'Pausar' : 'Empezar');
+  playBtn.title = (on ? 'Pausar' : 'Empezar') + ' (Espacio)';
+  const st = $('state');
+  const [word, tone, blink] =
+      editing ? ['Editando', 'sol', true]
+    : counting ? ['Preparado', 'sol', true]
+    : playing ? ['Leyendo', 'klein', false]
+    : (max && pos >= max-1) ? ['Fin', 'verde', false]
+    : (pos > 1) ? ['Pausa', 'sol', false]
+    : ['Listo', 'verde', false];
+  $('stateWord').textContent = word;
+  st.dataset.tone = tone; st.classList.toggle('is-blink', blink);
+}
+function play(){ playing=true; last=performance.now(); lock(true); setPlayUI(); poke(); }
+function pause(){
+  playing=false;
+  if (counting){ clearInterval(counting); counting=null; countEl.classList.remove('on'); }
+  lock(false); setPlayUI(); poke();
+}
+function countdown(){
+  let n=Number(S.countdown); countEl.textContent=n; countEl.classList.add('on');
+  counting = setInterval(() => {
+    n--;
+    if (n<=0){ clearInterval(counting); counting=null; countEl.classList.remove('on'); play(); }
+    else countEl.textContent=n;
+  }, 1000);
+  setPlayUI();
+}
+function toggle(){
+  if (playing || counting) return pause();
+  if (editing) stopEdit();
+  if (pos >= max-1) pos=0, render();
+  closeSheet();
+  Number(S.countdown) > 0 ? countdown() : play();
+}
+function restart(){ pause(); pos=0; render(); setPlayUI(); }
+function nudge(d){ pos = clamp(pos + d, 0, max); render(); setPlayUI(); }
+
+function frame(t){
+  if (playing){
+    const dt = Math.min(0.1, (t-last)/1000);
+    pos += pxps()*dt;
+    if (pos >= max){ pos=max; pause(); }
+    render();
+  }
+  last=t;
+  requestAnimationFrame(frame);
+}
+
+/* ---------- edición directa en pantalla ---------- */
+let plain = true;
+function startEdit(x, y){
+  if (editing) return;
+  pause(); closeSheet();
+  editing = true;
+  document.body.classList.add('editing');
+  $('inline').classList.add('is-active'); $('inline').textContent = 'Listo';
+  if (!S.script.trim()) text.textContent = '';
+  try { text.contentEditable = 'plaintext-only'; } catch(e){ text.contentEditable = 'true'; plain = false; }
+  apply(); setPlayUI();
+  text.focus({preventScroll:true});
+  let r = null;                                    // coloca el cursor donde se hizo clic
+  if (x != null){
+    if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(x, y);
+    else if (document.caretPositionFromPoint){
+      const p = document.caretPositionFromPoint(x, y);
+      if (p){ r = document.createRange(); r.setStart(p.offsetNode, p.offset); }
+    }
+  }
+  if (r && text.contains(r.startContainer)){
+    r.collapse(true);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  }
+}
+function stopEdit(){
+  if (!editing) return;
+  editing = false;
+  text.contentEditable = 'false'; text.blur();
+  getSelection().removeAllRanges();
+  document.body.classList.remove('editing');
+  $('inline').classList.remove('is-active'); $('inline').textContent = 'Editar';
+  S.script = S.script.replace(/\n+$/, '');
+  save(); apply(); setPlayUI();
+}
+function followCaret(){
+  if (!editing) return;
+  const sel = getSelection();
+  if (!sel.rangeCount || !text.contains(sel.focusNode)) return;
+  const r = sel.getRangeAt(0).cloneRange(); r.collapse(false);
+  const b = r.getClientRects()[0] || r.getBoundingClientRect();
+  if (!b || (!b.top && !b.bottom)) return;
+  const h = window.innerHeight;
+  if (b.bottom > h*0.75) nudge(b.bottom - h*0.55);
+  else if (b.top < h*0.08) nudge(b.top - h*0.3);
+}
+text.addEventListener('input', () => {
+  S.script = (plain ? text.textContent : text.innerText).replace(/ /g, ' ');
+  save(); apply(); followCaret();
+});
+text.addEventListener('paste', e => {          // pega siempre como texto plano
+  if (plain) return;
+  e.preventDefault();
+  document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+});
+document.addEventListener('selectionchange', followCaret);
+stage.addEventListener('scroll', () => {         // si el navegador desplaza el escenario, lo traducimos a nuestra posición
+  if (stage.scrollTop || stage.scrollLeft){ nudge(stage.scrollTop); stage.scrollTop = 0; stage.scrollLeft = 0; }
+});
+stage.addEventListener('dblclick', e => { if (!editing) startEdit(e.clientX, e.clientY); });
+
+/* ---------- hoja de ajustes ---------- */
+let opener = null, closeT = null;
+function openSheet(){
+  if (sheetOpen) return;
+  if (playing || counting) pause();
+  if (editing) stopEdit();
+  sheetOpen = true; opener = document.activeElement;
+  clearTimeout(closeT);
+  sheet.classList.add('is-open');
+  requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-in')));
+  panel.focus({preventScroll:true});
+  $('edit').classList.add('is-active');
+  poke();
+}
+function closeSheet(){
+  if (!sheetOpen) return;
+  sheetOpen = false;
+  panel.style.transform = '';
+  sheet.classList.remove('is-in');
+  closeT = setTimeout(() => sheet.classList.remove('is-open'), 220);
+  $('edit').classList.remove('is-active');
+  if (opener && opener.focus) opener.focus({preventScroll:true});
+}
+$('scrim').addEventListener('click', closeSheet);
+panel.addEventListener('keydown', e => {          // el foco no sale de la hoja
+  if (e.key !== 'Tab') return;
+  const f = [...panel.querySelectorAll('button, input, select, textarea')].filter(el => el.offsetParent && el.tabIndex >= 0);
+  if (!f.length) return;
+  const first = f[0], lastEl = f[f.length-1];
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); lastEl.focus(); }
+  else if (!e.shiftKey && document.activeElement === lastEl){ e.preventDefault(); first.focus(); }
+});
+let pull = null;                                   // arrastrar el asa para cerrar
+$('grab').addEventListener('pointerdown', e => { pull = {y:e.clientY, d:0}; panel.classList.add('is-dragging'); $('grab').setPointerCapture(e.pointerId); });
+$('grab').addEventListener('pointermove', e => {
+  if (!pull) return;
+  pull.d = Math.max(0, e.clientY - pull.y);
+  panel.style.transform = 'translateY(' + pull.d + 'px)';
+});
+const endPull = () => {
+  if (!pull) return;
+  panel.classList.remove('is-dragging');
+  if (pull.d > 96) closeSheet(); else panel.style.transform = '';
+  pull = null;
+};
+$('grab').addEventListener('pointerup', endPull);
+$('grab').addEventListener('pointercancel', endPull);
+
+/* ---------- interfaz ---------- */
+function fullscreen(){
+  const d=document, el=d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+}
+function poke(){
+  document.body.classList.remove('idle');
+  clearTimeout(idleT);
+  if (playing && !sheetOpen) idleT = setTimeout(() => document.body.classList.add('idle'), 2500);
+}
+
+const click = (id, fn) => $(id).addEventListener('click', e => { fn(); if (e.detail) e.currentTarget.blur(); });
+click('play', toggle); click('reset', restart);
+click('mirror', () => set('flipH', !S.flipH));
+click('inline', () => editing ? stopEdit() : startEdit());
+click('edit', () => sheetOpen ? closeSheet() : openSheet());
+click('close', closeSheet);
+click('full', fullscreen);
+click('defaults', () => { S = {...DEF, script:S.script}; save(); apply(); });
+
+let drag=null;
+stage.addEventListener('pointerdown', e => { if (editing) return; drag={y:e.clientY, moved:0}; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => {
+  poke();
+  if (!drag) return;
+  const dy = e.clientY - drag.y; drag.y = e.clientY; drag.moved += Math.abs(dy);
+  if (drag.moved > 6) nudge(-dy * (S.flipV ? -1 : 1));
+});
+stage.addEventListener('pointerup', () => { if (drag && drag.moved <= 6) toggle(); drag=null; });
+stage.addEventListener('pointercancel', () => drag=null);
+stage.addEventListener('wheel', e => { e.preventDefault(); poke(); nudge(e.deltaY * (S.flipV ? -1 : 1)); }, {passive:false});
+document.addEventListener('pointermove', poke);
+
+addEventListener('keydown', e => {
+  const t = e.target;
+  if (e.key === 'Escape'){ if (sheetOpen) closeSheet(); stopEdit(); return; }
+  if (sheetOpen || editing || t.isContentEditable) return;
+  if (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && t.type !== 'range')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const jump = S.size * S.lh * 3;
+  let hit = true;
+  switch (e.key){
+    case ' ': toggle(); break;
+    case 'ArrowUp': set('speed', clamp(S.speed+1, 1, 100)); break;
+    case 'ArrowDown': set('speed', clamp(S.speed-1, 1, 100)); break;
+    case 'ArrowLeft': nudge(-jump); break;
+    case 'ArrowRight': nudge(jump); break;
+    case '+': case '=': set('size', clamp(S.size+4, 20, 220)); break;
+    case '-': case '_': set('size', clamp(S.size-4, 20, 220)); break;
+    case 'r': case 'R': restart(); break;
+    case 'm': case 'M': set('flipH', !S.flipH); break;
+    case 'f': case 'F': fullscreen(); break;
+    case 'e': case 'E': openSheet(); break;
+    case 't': case 'T': startEdit(); break;
+    default: hit = false;
+  }
+  if (hit){ e.preventDefault(); poke(); }
+});
+
+addEventListener('resize', measure);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && playing) lock(true); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+
+apply(); setPlayUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

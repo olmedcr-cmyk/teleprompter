@@ -1,0 +1,15 @@
+name: Una idea
+description: Algo que haría más fácil grabar
+labels: [idea]
+body:
+  - type: textarea
+    id: para
+    attributes:
+      label: Para qué
+      description: Qué intentas hacer al grabar y qué te lo impide hoy.
+    validations: { required: true }
+  - type: textarea
+    id: como
+    attributes:
+      label: Cómo lo imaginas
+      description: Un atajo, un ajuste, un cambio de diseño… Si toca la interfaz, piensa en Frekvens.

@@ -1,0 +1,11 @@
+node_modules/
+.wrangler/
+.DS_Store
+.env
+.env.*
+# hojas de revisión de Hairline (se regeneran con make hairline-look)
+docs/hairline/*-look.png
+docs/hairline/*-blind.png
+docs/hairline/*-motion.png
+docs/hairline/hairline-*.html
+.claude/
