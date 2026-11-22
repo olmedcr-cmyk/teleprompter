@@ -28,7 +28,7 @@ jobs:
         run: echo "Faltan CLOUDFLARE_API_TOKEN o CLOUDFLARE_ACCOUNT_ID; no se despliega. Ver docs/04-despliegue.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Cloudflare Pages
         if: env.HAS_TOKEN == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
